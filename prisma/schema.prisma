@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  source   String?   @db.VarChar(100)
+  note      String?  @db.VarChar(255)
+  amount    Decimal  @db.Decimal(10, 2)
+  type      String   @db.VarChar(10) // "in" or "out"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
