@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 
-export default function Home() {
-  const [items, setItems] = useState([]);
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const [expenses, setExpenses] = useState([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     source: "",
@@ -13,24 +15,23 @@ export default function Home() {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState("all");
 
-  // Fetch all expenses
-  const fetchItems = async () => {
+  // Fetch expenses
+  const fetchExpenses = async () => {
     const res = await fetch("/api/expenses");
     const data = await res.json();
-    setItems(data);
+    setExpenses(data);
   };
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    if (status === "authenticated") fetchExpenses();
+  }, [status]);
 
-  // Add / Update expense
-  const submit = async (e) => {
+  // Submit add/update
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
       const url = editingId ? `/api/expenses/${editingId}` : "/api/expenses";
@@ -40,19 +41,13 @@ export default function Home() {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
+        credentials: "include",
       });
 
       if (!res.ok) throw new Error(await res.text());
-
-      setForm({
-        date: new Date().toISOString().slice(0, 10),
-        source: "",
-        note: "",
-        amount: "",
-        type: "out",
-      });
+      setForm({ date: new Date().toISOString().slice(0, 10), source: "", note: "", amount: "", type: "out" });
       setEditingId(null);
-      await fetchItems();
+      fetchExpenses();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -60,129 +55,81 @@ export default function Home() {
     }
   };
 
-  // Delete expense
+  const handleEdit = (exp) => {
+    setForm({
+      date: new Date(exp.date).toISOString().slice(0, 10),
+      source: exp.source || "",
+      note: exp.note || "",
+      amount: exp.amount,
+      type: exp.type,
+    });
+    setEditingId(exp.id);
+  };
+
   const handleDelete = async (id) => {
     if (!confirm("Delete this expense?")) return;
-    await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    await fetchItems();
+    await fetch(`/api/expenses/${id}`, { method: "DELETE", credentials: "include" });
+    fetchExpenses();
   };
 
-  // Edit expense
-  const handleEdit = (item) => {
-    const dateValue = new Date(item.date).toISOString().slice(0, 10);
-    setForm({
-      date: dateValue,
-      source: item.source || "",
-      note: item.note || "",
-      amount: item.amount,
-      type: item.type,
-    });
-    setEditingId(item.id);
-  };
-
-  const filteredItems = items.filter((i) =>
-    filter === "all" ? true : i.type === filter
-  );
+  if (status === "loading") return <p>Loading...</p>;
+  if (status === "unauthenticated") return <p>Please login</p>;
 
   return (
-    <main className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">💰 Expense Tracker</h1>
+    <div className="min-h-screen bg-gray-900 text-white p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Daily Expense Tracker</h1>
+        <button onClick={() => signOut({ callbackUrl: "/login" })} className="bg-red-500 px-4 py-2 rounded">Logout</button>
+      </div>
 
       {/* Form */}
-      <form onSubmit={submit} className="mb-6 space-y-3">
-        <input
-          type="date"
-          value={form.date}
-          onChange={(e) => setForm({ ...form, date: e.target.value })}
-          className="border p-2 w-full"
-          required
-        />
-        <input
-          type="text"
-          placeholder="Source (optional)"
-          value={form.source}
-          onChange={(e) => setForm({ ...form, source: e.target.value })}
-          className="border p-2 w-full"
-        />
-        <input
-          type="text"
-          placeholder="Note (optional)"
-          value={form.note}
-          onChange={(e) => setForm({ ...form, note: e.target.value })}
-          className="border p-2 w-full"
-        />
-        <input
-          type="number"
-          placeholder="Amount"
-          value={form.amount}
-          onChange={(e) => setForm({ ...form, amount: e.target.value })}
-          className="border p-2 w-full"
-          required
-        />
-        <select
-          value={form.type}
-          onChange={(e) => setForm({ ...form, type: e.target.value })}
-          className="border p-2 w-full"
-        >
-          <option value="out">⬇ Expense</option>
-          <option value="in">⬆ Income</option>
-        </select>
-
-        {error && <p className="text-red-600">{error}</p>}
-
-        <button
-          disabled={loading}
-          className="py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
-        >
-          {loading ? "Saving…" : editingId ? "Update Expense" : "Add Expense"}
+      <form className="bg-gray-800 p-4 rounded mb-6 space-y-3" onSubmit={handleSubmit}>
+        {error && <p className="text-red-500">{error}</p>}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="border p-2 rounded text-black" required />
+          <input type="text" placeholder="Source" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} className="border p-2 rounded text-black" />
+          <input type="text" placeholder="Note" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} className="border p-2 rounded text-black" />
+          <input type="number" placeholder="Amount" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="border p-2 rounded text-black" required />
+          <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="border p-2 rounded text-black">
+            <option value="out">Expense</option>
+            <option value="in">Income</option>
+          </select>
+        </div>
+        <button type="submit" disabled={loading} className="bg-green-500 py-2 px-4 rounded mt-2">
+          {editingId ? "Update Expense" : "Add Expense"}
         </button>
       </form>
 
-      {/* Filter */}
-      <div className="mb-4">
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="border p-2"
-        >
-          <option value="all">All</option>
-          <option value="in">Income Only</option>
-          <option value="out">Expense Only</option>
-        </select>
+      {/* Expenses Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto border-collapse border border-gray-700">
+          <thead>
+            <tr className="bg-gray-800">
+              <th className="border border-gray-700 p-2">Date</th>
+              <th className="border border-gray-700 p-2">Type</th>
+              <th className="border border-gray-700 p-2">Source</th>
+              <th className="border border-gray-700 p-2">Note</th>
+              <th className="border border-gray-700 p-2">Amount</th>
+              <th className="border border-gray-700 p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {expenses.map(exp => (
+              <tr key={exp.id} className="bg-gray-700">
+                <td className="border border-gray-600 p-2">{new Date(exp.date).toLocaleDateString()}</td>
+                <td className="border border-gray-600 p-2">{exp.type === "in" ? "Income" : "Expense"}</td>
+                <td className="border border-gray-600 p-2">{exp.source}</td>
+                <td className="border border-gray-600 p-2">{exp.note}</td>
+                <td className="border border-gray-600 p-2">{Number(exp.amount).toFixed(2)}</td>
+                <td className="border border-gray-600 p-2 space-x-2">
+                  <button onClick={() => handleEdit(exp)} className="bg-blue-500 px-2 py-1 rounded">Edit</button>
+                  <button onClick={() => handleDelete(exp.id)} className="bg-red-500 px-2 py-1 rounded">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* List */}
-      <ul className="divide-y">
-        {filteredItems.map((i) => (
-          <li key={i.id} className="py-3 flex justify-between items-center">
-            <div>
-              <div className="font-medium">
-                {i.type === "in" ? "⬆ Income" : "⬇ Expense"}
-                {i.source ? ` — ${i.source}` : ""} — ৳{" "}
-                {Number(i.amount).toFixed(2)}
-              </div>
-              <div className="text-xs text-gray-500">
-                {new Date(i.date).toLocaleDateString()}{" "}
-                {i.note ? `• ${i.note}` : ""}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleEdit(i)}
-                className="text-blue-600 text-sm"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(i.id)}
-                className="text-red-600 text-sm"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </main>
+    </div>
   );
 }
