@@ -1,7 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
+import { signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
-export default function DashboardPageClient({ initialExpenses, userId }) {
+export default function DashboardPageClient({ initialExpenses }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [expenses, setExpenses] = useState(initialExpenses || []);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -14,16 +18,25 @@ export default function DashboardPageClient({ initialExpenses, userId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Redirect to login if not authenticated, but show loader first
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      const timeout = setTimeout(() => router.push("/login"), 800); // show loader briefly
+      return () => clearTimeout(timeout);
+    }
+  }, [status]);
+
   // Fetch expenses
   const fetchExpenses = async () => {
+    if (!session) return;
     const res = await fetch("/api/expenses");
     const data = await res.json();
     setExpenses(data);
   };
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    if (status === "authenticated") fetchExpenses();
+  }, [status]);
 
   // Add / Update expense
   const submit = async (e) => {
@@ -69,7 +82,7 @@ export default function DashboardPageClient({ initialExpenses, userId }) {
       type: item.type,
     });
     setEditingId(item.id);
-    window.scrollTo({ top: 0, behavior: "smooth" }); // Scroll to top to see full-width form
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Delete
@@ -79,9 +92,29 @@ export default function DashboardPageClient({ initialExpenses, userId }) {
     await fetchExpenses();
   };
 
+  // Full-page loader
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+        <p>{status === "loading" ? "Loading…" : "Redirecting…"}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-3xl font-bold mb-6">💰 Daily Expense Tracker</h1>
+      {/* Header with title and logout */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">💰 Daily Expense Tracker</h1>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
+        >
+          Logout
+        </button>
+      </div>
+
       {/* Full-width Add/Edit Form */}
       <form
         onSubmit={submit}
@@ -154,7 +187,7 @@ export default function DashboardPageClient({ initialExpenses, userId }) {
             <th className="p-2">Amount</th>
             <th className="p-2">Type</th>
             <th className="p-2">Date</th>
-            <th className="p-2">Actions</th>
+            <th className="p-2 min-w-[80px] w-auto">Actions</th>
           </tr>
         </thead>
         <tbody>

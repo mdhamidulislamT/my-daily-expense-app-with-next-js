@@ -1,18 +1,29 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(""); // ✅ Success message state
+  const [success, setSuccess] = useState(""); // Success message
+  const [redirecting, setRedirecting] = useState(false); // Loader only during redirect
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (status === "authenticated") {
+      setRedirecting(true);
+      router.push("/"); // dashboard
+    }
+  }, [status, router]);
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccess(""); // Clear previous success
+    setSuccess("");
 
     const res = await fetch("/api/auth/register", {
       method: "POST",
@@ -21,7 +32,7 @@ export default function RegisterPage() {
     });
 
     if (res.ok) {
-      setSuccess("Registration successful! You can now login."); // ✅ Show success
+      setSuccess("Registration successful! You can now login.");
       setEmail("");
       setPassword("");
     } else {
@@ -30,9 +41,18 @@ export default function RegisterPage() {
     }
   };
 
+  // Show redirect loader if redirecting
+  if (redirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        Redirecting…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-      {/* ✅ App Title */}
+      {/* App Title */}
       <h1 className="text-3xl font-bold mb-6 mr-6">💰 Daily Expense Tracker</h1>
 
       <form
@@ -41,7 +61,7 @@ export default function RegisterPage() {
       >
         <h1 className="text-2xl font-bold">Register</h1>
         {error && <p className="text-red-500">{error}</p>}
-        {success && <p className="text-green-500">{success}</p>} {/* ✅ Success message */}
+        {success && <p className="text-green-500">{success}</p>}
         <input
           type="email"
           placeholder="Email"
