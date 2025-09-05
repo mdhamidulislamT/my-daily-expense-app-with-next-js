@@ -12,20 +12,48 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    const res = await signIn("credentials", { redirect: false, email, password });
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
     if (res.error) setError(res.error);
     else router.push("/");
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
-      <h1 className="text-3xl font-bold mb-6">Daily Expense Tracker</h1>
-      <form className="p-6 border rounded space-y-4 w-80 bg-gray-800" onSubmit={handleLogin}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        {/* ✅ App Title */}
+      <h1 className="text-3xl font-bold mb-6  mr-6">💰 Daily Expense Tracker</h1>
+
+      <form
+        onSubmit={handleLogin}
+        className="p-6 bg-gray-800 rounded shadow w-96 space-y-4"
+      >
+        <h1 className="text-2xl font-bold">Login</h1>
         {error && <p className="text-red-500">{error}</p>}
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="border p-2 w-full rounded text-black" required />
-        <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="border p-2 w-full rounded text-black" required />
-        <button type="submit" className="w-full bg-green-500 py-2 rounded">Login</button>
-        <button type="button" onClick={() => router.push("/register")} className="w-full bg-gray-600 py-2 rounded">Register</button>
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full p-2 rounded bg-gray-700"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          className="w-full p-2 rounded bg-gray-700"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button className="w-full bg-blue-600 py-2 rounded">Login</button>
+        <button
+          type="button"
+          onClick={() => router.push("/register")}
+          className="w-full bg-gray-600 py-2 rounded"
+        >
+          Register
+        </button>
       </form>
     </div>
   );

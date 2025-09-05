@@ -4,21 +4,33 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const authOptions = {
+  session: { strategy: "jwt" }, // ✅ use JWT session
   providers: [
     CredentialsProvider({
       name: "Credentials",
-      credentials: { email: { label: "Email", type: "text" }, password: { label: "Password", type: "password" } },
+      credentials: { email: {}, password: {} },
       async authorize(credentials) {
-        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
         if (!user) throw new Error("No user found");
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) throw new Error("Invalid password");
+        const valid = await bcrypt.compare(credentials.password, user.password);
+        if (!valid) throw new Error("Invalid password");
         return { id: user.id, email: user.email };
       },
     }),
   ],
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) token.id = user.id;
+      return token;
+    },
+    async session({ session, token }) {
+      session.user.id = token.id;
+      return session;
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET, // ✅ must be set
 };
 
 const handler = NextAuth(authOptions);

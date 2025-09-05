@@ -1,8 +1,8 @@
-import { getServerSession } from "next-auth/next";
+import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import prisma from "@/lib/prisma";
+import prisma from "../../../lib/prisma";
 
-export async function GET() {
+export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session) return new Response("Unauthorized", { status: 401 });
 
@@ -17,16 +17,38 @@ export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session) return new Response("Unauthorized", { status: 401 });
 
-  const body = await req.json();
+  const { date, source, note, amount, type } = await req.json();
   const expense = await prisma.expense.create({
     data: {
-      date: new Date(body.date),
-      source: body.source || null,
-      note: body.note || null,
-      amount: parseFloat(body.amount),
-      type: body.type,
-      user: { connect: { id: session.user.id } },
+      date: new Date(date),
+      source,
+      note,
+      amount: parseFloat(amount),
+      type,
+      userId: session.user.id,
     },
   });
   return new Response(JSON.stringify(expense), { status: 201 });
+}
+
+export async function PUT(req, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return new Response("Unauthorized", { status: 401 });
+
+  const { id } = params;
+  const { date, source, note, amount, type } = await req.json();
+  const expense = await prisma.expense.update({
+    where: { id: parseInt(id) },
+    data: { date: new Date(date), source, note, amount: parseFloat(amount), type },
+  });
+  return new Response(JSON.stringify(expense), { status: 200 });
+}
+
+export async function DELETE(req, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return new Response("Unauthorized", { status: 401 });
+
+  const { id } = params;
+  await prisma.expense.delete({ where: { id: parseInt(id) } });
+  return new Response(null, { status: 204 });
 }
